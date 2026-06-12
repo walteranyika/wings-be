@@ -1,12 +1,14 @@
 from django.urls import path
 
 from .views import (
+    CompanyEmployerSignupView,
     EmployeeSignupIDDocumentsView,
     EmployeeSignupPersonalInfoView,
     EmployeeSignupPhoneView,
     EmployeeSignupSubmitView,
     EmployeeSignupVerifyOTPView,
     EmployeeSignupWorkInfoView,
+    HouseholdEmployerSignupView,
     LoginView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -28,4 +30,6 @@ urlpatterns = [
     path("auth/employee/signup/work", EmployeeSignupWorkInfoView.as_view(), name="employee-signup-work"),
     path("auth/employee/signup/id-documents", EmployeeSignupIDDocumentsView.as_view(), name="employee-signup-id-documents"),
     path("auth/employee/signup/submit", EmployeeSignupSubmitView.as_view(), name="employee-signup-submit"),
+    path("auth/employer/signup/household", HouseholdEmployerSignupView.as_view(), name="employer-signup-household"),
+    path("auth/employer/signup/company", CompanyEmployerSignupView.as_view(), name="employer-signup-company"),
 ]

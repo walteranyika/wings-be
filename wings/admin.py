@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import EmployeeProfile, EmployeeSignupApplication, SignupOTP, Skill, User
+from .models import EmployeeProfile, EmployeeSignupApplication, EmployerProfile, SignupOTP, Skill, User
 
 
 @admin.register(User)
@@ -41,6 +41,19 @@ class EmployeeSignupApplicationAdmin(admin.ModelAdmin):
     search_fields = ["phone", "full_name", "national_id"]
     list_filter = ["status", "gender"]
     filter_horizontal = ["skills"]
+
+
+@admin.register(EmployerProfile)
+class EmployerProfileAdmin(admin.ModelAdmin):
+    list_display = ["user", "employer_type", "email", "location", "created_at", "updated_at"]
+    search_fields = [
+        "user__phone",
+        "user__full_name",
+        "email",
+        "company_name",
+        "company_registration_number",
+    ]
+    list_filter = ["employer_type"]
 
 
 @admin.register(Skill)

@@ -103,6 +103,33 @@ class EmployeeProfile(models.Model):
         return f"{self.user.full_name} profile"
 
 
+class EmployerProfile(models.Model):
+    class EmployerType(models.TextChoices):
+        HOUSEHOLD = "household", "Household"
+        COMPANY = "company", "Company"
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="employer_profile",
+    )
+    employer_type = models.CharField(max_length=20, choices=EmployerType.choices)
+    email = models.EmailField(unique=True)
+    location = models.CharField(max_length=255)
+    company_name = models.CharField(max_length=255, blank=True)
+    company_registration_number = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.full_name} employer profile"
+
+
 class SignupOTP(models.Model):
     class Purpose(models.TextChoices):
         EMPLOYEE_SIGNUP = "employee_signup", "Employee signup"

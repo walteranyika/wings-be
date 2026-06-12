@@ -5,17 +5,20 @@ from rest_framework.views import APIView
 
 from .models import Skill
 from .serializers import (
+    CompanyEmployerSignupSerializer,
     EmployeeIDDocumentsSerializer,
     EmployeePersonalInfoSerializer,
     EmployeeSignupOTPVerifySerializer,
     EmployeeSignupPhoneSerializer,
     EmployeeSubmitApplicationSerializer,
     EmployeeWorkInfoSerializer,
+    HouseholdEmployerSignupSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     PasswordResetVerifySerializer,
     SkillSerializer,
+    token_response_for_user,
     UserProfileSerializer,
 )
 
@@ -99,6 +102,38 @@ class EmployeeSignupSubmitView(APIView):
         serializer.save()
         return Response(
             {"message": "Your application has been submitted and is under review."},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class HouseholdEmployerSignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = HouseholdEmployerSignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {
+                "message": "Household employer account created successfully.",
+                **token_response_for_user(user),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CompanyEmployerSignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = CompanyEmployerSignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {
+                "message": "Company employer account created successfully.",
+                **token_response_for_user(user),
+            },
             status=status.HTTP_201_CREATED,
         )
 

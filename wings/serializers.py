@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import EmployeeProfile, EmployeeSignupApplication, SignupOTP, Skill, User
+from .models import EmployeeProfile, EmployeeSignupApplication, EmployerProfile, SignupOTP, Skill, User
 
 
 KENYAN_COUNTIES = {
@@ -146,8 +146,21 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
         return self.get_file_url(obj.id_back)
 
 
+class EmployerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployerProfile
+        fields = [
+            "employer_type",
+            "email",
+            "location",
+            "company_name",
+            "company_registration_number",
+        ]
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     employee_profile = serializers.SerializerMethodField()
+    employer_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -161,6 +174,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "user_type",
             "review_status",
             "employee_profile",
+            "employer_profile",
         ]
 
     def get_employee_profile(self, obj):
@@ -170,6 +184,129 @@ class UserProfileSerializer(serializers.ModelSerializer):
             obj.employee_profile,
             context=self.context,
         ).data
+
+    def get_employer_profile(self, obj):
+        if not hasattr(obj, "employer_profile"):
+            return None
+        return EmployerProfileSerializer(obj.employer_profile).data
+
+
+def token_response_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
+        "user": {
+            "id": user.id,
+            "phone": user.phone,
+            "full_name": user.full_name,
+            "user_type": user.user_type,
+            "review_status": user.review_status,
+        },
+    }
+
+
+class EmployerSignupBaseSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    phone = serializers.CharField()
+    location = serializers.CharField(max_length=255)
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+
+    employer_type = None
+
+    def validate_email(self, value):
+        email = value.strip().lower()
+        if EmployerProfile.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("An employer with this email address already exists.")
+        return email
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        if User.objects.filter(phone=phone).exists():
+            raise serializers.ValidationError("An account with this phone number already exists.")
+        return phone
+
+    def validate_location(self, value):
+        location = " ".join(str(value or "").split())
+        if not location:
+            raise serializers.ValidationError("Location is required.")
+        return location
+
+    def validate_password(self, value):
+        password_validation.validate_password(value)
+        return value
+
+    def build_user_full_name(self):
+        raise NotImplementedError
+
+    def build_profile_defaults(self):
+        raise NotImplementedError
+
+    @transaction.atomic
+    def save(self, **kwargs):
+        user = User.objects.create_user(
+            phone=self.validated_data["phone"],
+            password=self.validated_data["password"],
+            full_name=self.build_user_full_name(),
+            user_type=User.UserType.EMPLOYER,
+            review_status=User.ReviewStatus.APPROVED,
+            is_active=True,
+        )
+        EmployerProfile.objects.create(
+            user=user,
+            employer_type=self.employer_type,
+            email=self.validated_data["email"],
+            location=self.validated_data["location"],
+            **self.build_profile_defaults(),
+        )
+        return user
+
+
+class HouseholdEmployerSignupSerializer(EmployerSignupBaseSerializer):
+    full_name = serializers.CharField(max_length=255)
+    employer_type = EmployerProfile.EmployerType.HOUSEHOLD
+
+    def validate_full_name(self, value):
+        return validate_full_name(value)
+
+    def build_user_full_name(self):
+        return self.validated_data["full_name"]
+
+    def build_profile_defaults(self):
+        return {}
+
+
+class CompanyEmployerSignupSerializer(EmployerSignupBaseSerializer):
+    company_name = serializers.CharField(max_length=255)
+    company_registration_number = serializers.CharField(max_length=100)
+    employer_type = EmployerProfile.EmployerType.COMPANY
+
+    def validate_company_name(self, value):
+        company_name = " ".join(str(value or "").split())
+        if not company_name:
+            raise serializers.ValidationError("Company name is required.")
+        return company_name
+
+    def validate_company_registration_number(self, value):
+        registration_number = " ".join(str(value or "").split()).upper()
+        if not registration_number:
+            raise serializers.ValidationError("Company registration number is required.")
+        if EmployerProfile.objects.filter(
+            company_registration_number__iexact=registration_number
+        ).exists():
+            raise serializers.ValidationError(
+                "An employer with this company registration number already exists."
+            )
+        return registration_number
+
+    def build_user_full_name(self):
+        return self.validated_data["company_name"]
+
+    def build_profile_defaults(self):
+        return {
+            "company_name": self.validated_data["company_name"],
+            "company_registration_number": self.validated_data["company_registration_number"],
+        }
 
 
 class EmployeeSignupPhoneSerializer(serializers.Serializer):
@@ -453,19 +590,7 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
     def save(self, **kwargs):
-        user = self.validated_data["user"]
-        refresh = RefreshToken.for_user(user)
-        return {
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-            "user": {
-                "id": user.id,
-                "phone": user.phone,
-                "full_name": user.full_name,
-                "user_type": user.user_type,
-                "review_status": user.review_status,
-            },
-        }
+        return token_response_for_user(self.validated_data["user"])
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
