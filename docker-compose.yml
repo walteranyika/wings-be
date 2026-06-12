@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8001:8000"
+    environment:
+      DB_ENGINE: django.db.backends.mysql
+      DB_NAME: wings
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_HOST: db
+      DB_PORT: 3306
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,testserver
+    volumes:
+      - .:/app
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wings
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql_data:
+  media_data:
